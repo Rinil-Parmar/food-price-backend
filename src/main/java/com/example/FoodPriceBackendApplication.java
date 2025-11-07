@@ -8,6 +8,7 @@ public class FoodPriceBackendApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(FoodPriceBackendApplication.class, args);
+		System.out.println("Product Import Service is running...");
 	}
 
 }
