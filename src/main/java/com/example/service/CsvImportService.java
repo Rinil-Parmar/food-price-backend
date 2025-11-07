@@ -1,6 +1,5 @@
 package com.example.service;
 
-
 import com.example.model.Product;
 import com.example.repository.ProductRepository;
 import com.opencsv.CSVReader;
@@ -8,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,33 +17,33 @@ public class CsvImportService {
 
     private final ProductRepository productRepository;
 
-    public void importCsv() {
+    /**
+     * Imports products from the local CSV file into MongoDB.
+     * Clears previous data before import.
+     *
+     * @return the number of products imported
+     * @throws RuntimeException if CSV cannot be read or import fails
+     */
+    public int importCsv() {
+        int count = 0;
+
         try (CSVReader reader = new CSVReader(
                 new InputStreamReader(new ClassPathResource("products.csv").getInputStream()))) {
 
-            // Step 1: Clear old data
+            // Step 1: Clear previous data
             productRepository.deleteAll();
-            System.out.println("Old data cleared from MongoDB.");
 
-            // skip header
+            // Step 2: Skip header row
             reader.readNext();
+
             String[] nextLine;
             List<Product> products = new ArrayList<>();
 
+            // Step 3: Read CSV rows
             while ((nextLine = reader.readNext()) != null) {
                 Product product = new Product();
                 product.setProductName(nextLine[0]);
-//                String priceText = nextLine[1].replace("$", "").replace("/kg", "").trim();
-//                double price = 0.0;
-//                try {
-//                    price = Double.parseDouble(priceText);
-//                } catch (NumberFormatException e) {
-//                    System.err.println("⚠️ Skipping invalid price: " + nextLine[1]);
-//                }
-//                product.setPrice(price);
-                product.setPrice(nextLine[1]);
-
-
+                product.setPrice(nextLine[1]);  // store price as string
                 product.setDescription(nextLine[2]);
                 product.setImageUrl(nextLine[3]);
                 product.setAvailability(nextLine[4]);
@@ -53,12 +51,17 @@ public class CsvImportService {
                 product.setStoreName(nextLine[6]);
                 product.setProductUrl(nextLine[7]);
                 products.add(product);
+                count++;
             }
 
+            // Step 4: Save all products to MongoDB
             productRepository.saveAll(products);
-            System.out.println("✅ Imported " + products.size() + " products from local CSV.");
+
         } catch (Exception e) {
-            System.err.println("❌ Error importing CSV: " + e.getMessage());
+            // Rethrow exception to controller for proper ApiResponse handling
+            throw new RuntimeException("Error importing CSV: " + e.getMessage(), e);
         }
+
+        return count;
     }
 }
