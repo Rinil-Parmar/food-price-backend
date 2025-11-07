@@ -16,6 +16,7 @@ import java.util.List;
 public class CsvImportService {
 
     private final ProductRepository productRepository;
+    private final ProductService productService; // Inject ProductService
 
     /**
      * Imports products from the local CSV file into MongoDB.
@@ -56,6 +57,8 @@ public class CsvImportService {
 
             // Step 4: Save all products to MongoDB
             productRepository.saveAll(products);
+            // Reload cache for fast access
+            productService.reloadCache();
 
         } catch (Exception e) {
             // Rethrow exception to controller for proper ApiResponse handling
