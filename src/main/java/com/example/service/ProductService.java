@@ -71,7 +71,7 @@ public class ProductService {
     }
 
     // -----------------------------
-    // Search API with Pagination
+    // Search API
     // -----------------------------
     public List<Product> searchProducts(String query, int page, int size) {
         if (query == null || query.isEmpty()) return Collections.emptyList();
