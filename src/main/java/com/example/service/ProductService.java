@@ -1,5 +1,7 @@
 package com.example.service;
 
+import com.example.dto.CompareRequest;
+import com.example.dto.RecommendRequest;
 import com.example.model.Product;
 import com.example.repository.ProductRepository;
 import jakarta.annotation.PostConstruct;
@@ -123,5 +125,132 @@ public class ProductService {
         }
         return false;
     }
+
+// =======================================
+// Compare Products Across Multiple Stores
+// =======================================
+
+    /**
+     * Algorithm:
+     * 1. Fetch all products from MongoDB.
+     * 2. Apply filters:
+     * - Category match (if provided)
+     * - Availability (only "In-stock" if required)
+     * - Store filter (match selected stores)
+     * - Price range filter (within min–max range)
+     * 3. Normalize price by using salePrice if available, else regular price.
+     * 4. Sort filtered products by effective price (ascending).
+     * 5. Return the sorted list — lowest price and best deals first.
+     */
+    public List<Product> compareProducts(CompareRequest req) {
+
+        List<Product> products = productRepository.findAll().stream()
+
+                //  Filter by category (if specified)
+                .filter(p -> (req.getCategory() == null ||
+                        p.getCategory().equalsIgnoreCase(req.getCategory())))
+
+                //  Filter by availability ("In-stock" only if requested)
+                .filter(p -> (req.isAvailability()
+                        ? "In-stock".equalsIgnoreCase(p.getAvailability())
+                        : true))
+
+                //  Filter by selected stores (if provided)
+                .filter(p -> (req.getStores() == null || req.getStores().isEmpty() ||
+                        req.getStores().contains(p.getStoreName())))
+
+                // Filter by price range (min–max)
+                .filter(p -> {
+                    try {
+                        double price = Double.parseDouble(
+                                p.getSalePrice() != null
+                                        ? p.getSalePrice().replace("$", "")
+                                        : p.getPrice().replace("$", ""));
+                        return req.getPriceRange() == null ||
+                                (price >= req.getPriceRange().get(0) &&
+                                        price <= req.getPriceRange().get(1));
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+
+                //  Sort by effective price (cheapest first)
+                .sorted(Comparator.comparingDouble(p -> {
+                    try {
+                        return Double.parseDouble(
+                                p.getSalePrice() != null
+                                        ? p.getSalePrice().replace("$", "")
+                                        : p.getPrice().replace("$", ""));
+                    } catch (Exception e) {
+                        return Double.MAX_VALUE;
+                    }
+                }))
+
+                //  Collect the results into a list
+                .toList();
+
+        return products;
+    }
+
+    /**
+     * Recommend the best supermarket(s) based on user preferences.
+     * <p>
+     * Algorithm:
+     * - Fetch all products from MongoDB.
+     * - For each product, calculate a weighted score using:
+     * - Product match with user needs
+     * - Preferred provider bonus
+     * - Loyalty program bonus
+     * - Lower price advantage
+     * - Aggregate and rank stores by total score.
+     *
+     * @param req Recommendation request (preferences, product needs, etc.)
+     * @return List of store names ranked by recommendation score.
+     */
+    public List<String> recommendStores(RecommendRequest req) {
+        List<Product> products = productRepository.findAll();
+        Map<String, Double> storeScores = new HashMap<>();
+
+        for (Product p : products) {
+            double basePrice = 0.0;
+            try {
+                basePrice = Double.parseDouble(
+                        (p.getSalePrice() != null && !p.getSalePrice().isEmpty())
+                                ? p.getSalePrice().replace("$", "").trim()
+                                : p.getPrice().replace("$", "").trim()
+                );
+            } catch (Exception ignored) {
+            }
+
+            double score = 0.0;
+
+            // Match product needs
+            if (req.getProductNeeds().stream()
+                    .anyMatch(name -> p.getProductName().toLowerCase().contains(name.toLowerCase())))
+                score += 5;
+
+            // Preferred store bonus
+            if (req.getPreferredProvider() != null &&
+                    p.getStoreName().equalsIgnoreCase(req.getPreferredProvider()))
+                score += 3;
+
+            // Loyalty program bonus
+            if (req.isLoyaltyProgram() && "LOYALTY".equalsIgnoreCase(p.getDealType()))
+                score += 2;
+
+            // Cheaper price gets higher score
+            score -= basePrice / 10.0;
+
+            storeScores.put(p.getStoreName(),
+                    storeScores.getOrDefault(p.getStoreName(), 0.0) + score);
+        }
+
+        // Rank stores by total score
+        return storeScores.entrySet().stream()
+                .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                .map(Map.Entry::getKey)
+                .toList();
+    }
+
 
 }
