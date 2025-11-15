@@ -144,53 +144,57 @@ public class ProductService {
      */
     public List<Product> compareProducts(CompareRequest req) {
 
-        List<Product> products = productRepository.findAll().stream()
+        return productRepository.findAll().stream()
 
-                //  Filter by category (if specified)
-                .filter(p -> (req.getCategory() == null ||
-                        p.getCategory().equalsIgnoreCase(req.getCategory())))
+                .filter(p -> req.getCategory() == null ||
+                        p.getCategory().equalsIgnoreCase(req.getCategory()))
 
-                //  Filter by availability ("In-stock" only if requested)
-                .filter(p -> (req.isAvailability()
-                        ? "In-stock".equalsIgnoreCase(p.getAvailability())
-                        : true))
+                .filter(p -> !req.isAvailability() ||
+                        "In-stock".equalsIgnoreCase(p.getAvailability()))
 
-                //  Filter by selected stores (if provided)
-                .filter(p -> (req.getStores() == null || req.getStores().isEmpty() ||
-                        req.getStores().contains(p.getStoreName())))
+                .filter(p -> req.getStores() == null ||
+                        req.getStores().isEmpty() ||
+                        req.getStores().contains(p.getStoreName()))
 
-                // Filter by price range (min–max)
+                // NEW — sale-only filter using dealType
+                .filter(p -> !req.isSaleOnly() ||
+                        (p.getDealType() != null && !p.getDealType().equalsIgnoreCase("NONE")))
+
                 .filter(p -> {
+                    if (req.getPriceRange() == null) return true;
+
+                    double price;
                     try {
-                        double price = Double.parseDouble(
-                                p.getSalePrice() != null
-                                        ? p.getSalePrice().replace("$", "")
-                                        : p.getPrice().replace("$", ""));
-                        return req.getPriceRange() == null ||
-                                (price >= req.getPriceRange().get(0) &&
-                                        price <= req.getPriceRange().get(1));
+                        String priceStr =
+                                (p.getSalePrice() != null && !p.getSalePrice().isBlank())
+                                        ? p.getSalePrice()
+                                        : p.getPrice();
+
+                        price = Double.parseDouble(priceStr.replace("$", ""));
                     } catch (Exception e) {
                         return false;
                     }
+
+                    return price >= req.getPriceRange().get(0)
+                            && price <= req.getPriceRange().get(1);
                 })
 
-                //  Sort by effective price (cheapest first)
                 .sorted(Comparator.comparingDouble(p -> {
                     try {
-                        return Double.parseDouble(
-                                p.getSalePrice() != null
-                                        ? p.getSalePrice().replace("$", "")
-                                        : p.getPrice().replace("$", ""));
+                        String priceStr =
+                                (p.getSalePrice() != null && !p.getSalePrice().isBlank())
+                                        ? p.getSalePrice()
+                                        : p.getPrice();
+
+                        return Double.parseDouble(priceStr.replace("$", ""));
                     } catch (Exception e) {
                         return Double.MAX_VALUE;
                     }
                 }))
 
-                //  Collect the results into a list
                 .toList();
-
-        return products;
     }
+
 
     /**
      * Recommend the best supermarket(s) based on user preferences.

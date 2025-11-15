@@ -20,8 +20,10 @@ public class AnalysisController {
     //  Compare API
     @PostMapping("/compare")
     public ApiResponse<List<Product>> compareProducts(@RequestBody CompareRequest req) {
-        return new ApiResponse<>("success", "Comparison complete", productService.compareProducts(req));
+        List<Product> products = productService.compareProducts(req);
+        return new ApiResponse<>("success", "Filtered products", products);
     }
+
 
     // Recommendation API
     @PostMapping("/recommend")
