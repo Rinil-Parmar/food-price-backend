@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final TrieService trieService; // NEW: Inject TrieService
 
     private Map<String, Product> productByIdMap = new HashMap<>();
     private Map<String, List<Product>> productsByCategoryMap = new HashMap<>();
@@ -30,12 +31,24 @@ public class ProductService {
         productByIdMap.clear();
         productsByCategoryMap.clear();
         productsByStoreMap.clear();
+        trieService.clear(); // NEW: Clear Trie
 
         List<Product> products = productRepository.findAll();
         for (Product p : products) {
             productByIdMap.put(p.getId(), p);
             productsByCategoryMap.computeIfAbsent(p.getCategory(), k -> new ArrayList<>()).add(p);
             productsByStoreMap.computeIfAbsent(p.getStoreName(), k -> new ArrayList<>()).add(p);
+
+            // NEW: Index product names in Trie for autocomplete
+            trieService.insert(p.getProductName());
+
+            // Optional: Also index individual words from product names
+            String[] words = p.getProductName().split("\\s+");
+            for (String word : words) {
+                if (word.length() > 2) { // Only index words longer than 2 chars
+                    trieService.insert(word);
+                }
+            }
         }
     }
 
@@ -78,9 +91,11 @@ public class ProductService {
     public List<Product> searchProducts(String query, int page, int size) {
         if (query == null || query.isEmpty()) return Collections.emptyList();
 
+        // NEW: Track search query in Trie for autocomplete suggestions
+        trieService.insert(query);
+
         List<Product> allProducts = new ArrayList<>(productByIdMap.values());
         List<Product> matched = allProducts.stream()
-//                .filter(p -> p.getProductName().toLowerCase().contains(query.toLowerCase()))
                 .filter(p -> boyerMooreSearch(p.getProductName().toLowerCase(), query.toLowerCase()))
                 .collect(Collectors.toList());
 
@@ -255,6 +270,4 @@ public class ProductService {
                 .map(Map.Entry::getKey)
                 .toList();
     }
-
-
 }

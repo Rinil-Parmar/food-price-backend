@@ -29,7 +29,7 @@ public class CsvImportService {
         int count = 0;
 
         try (CSVReader reader = new CSVReader(
-                new InputStreamReader(new ClassPathResource("products.csv").getInputStream()))) {
+                new InputStreamReader(new ClassPathResource("products1.csv").getInputStream()))) {
 
             // Step 1: Clear previous data
             productRepository.deleteAll();
