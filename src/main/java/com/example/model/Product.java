@@ -20,4 +20,9 @@ public class Product {
     private String category;
     private String storeName;
     private String productUrl;
+
+    // 🔹 New fields for deals
+    private String salePrice;     // Sale price during promotion
+    private String loyaltyPrice;  // Loyalty member price
+    private String dealType;      // Example: "SALE", "LOYALTY", "CLEARANCE
 }
